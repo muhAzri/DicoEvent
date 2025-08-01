@@ -78,12 +78,35 @@ class UserListSerializer(serializers.ModelSerializer):
 class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('username', 'email', 'first_name', 'last_name')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name')
         
     def to_representation(self, instance):
         return {
+            'id': str(instance.id),
             'username': instance.username or '',
             'email': instance.email or '',
             'first_name': instance.first_name or '',
             'last_name': instance.last_name or '',
         }
+
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(write_only=True, required=True)
+
+    class Meta:
+        model = User
+        fields = ('username', 'password')
+
+    def validate_username(self, value):
+        user = self.instance
+        if User.objects.exclude(pk=user.pk).filter(username=value).exists():
+            raise serializers.ValidationError("Username already exists")
+        return value
+
+    def update(self, instance, validated_data):
+        instance.username = validated_data.get('username', instance.username)
+        if 'password' in validated_data:
+            instance.set_password(validated_data['password'])
+        instance.save()
+        return instance
