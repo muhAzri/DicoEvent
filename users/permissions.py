@@ -6,7 +6,7 @@ class IsAdminOrSuperUser(BasePermission):
         return (
             request.user and 
             request.user.is_authenticated and 
-            request.user.role in ['admin', 'superuser']
+            (request.user.is_admin or request.user.is_superuser)
         )
 
 
@@ -36,7 +36,7 @@ class UserDetailPermission(BasePermission):
             return (
                 request.user and 
                 request.user.is_authenticated and 
-                request.user.role in ['admin', 'superuser']
+                (request.user.is_admin or request.user.is_superuser)
             )
         # PUT/PATCH requires authentication
         return request.user and request.user.is_authenticated

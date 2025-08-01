@@ -15,8 +15,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = User.objects.create_user(
             username=validated_data['username'],
-            password=validated_data['password'],
-            role='user'
+            password=validated_data['password']
         )
         return user
 
@@ -49,10 +48,12 @@ class LoginSerializer(serializers.Serializer):
         user = validated_data['user']
         refresh = RefreshToken.for_user(user)
         
-        # Add role to token payload
-        refresh['role'] = user.role
+        # Add user info to token payload
+        refresh['is_admin'] = user.is_admin
+        refresh['is_superuser'] = user.is_superuser
         access = refresh.access_token
-        access['role'] = user.role
+        access['is_admin'] = user.is_admin
+        access['is_superuser'] = user.is_superuser
         
         return {
             'refresh': str(refresh),
@@ -63,13 +64,15 @@ class LoginSerializer(serializers.Serializer):
 class UserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'role', 'created_at', 'updated_at')
+        fields = ('id', 'username', 'created_at', 'updated_at')
         
     def to_representation(self, instance):
         return {
             'id': str(instance.id),
             'username': instance.username,
-            'role': instance.role,
+            'is_admin': instance.is_admin,
+            'is_superuser': instance.is_superuser,
+            'groups': [group.name for group in instance.groups.all()],
             'created_at': instance.created_at.isoformat(),
             'updated_at': instance.updated_at.isoformat(),
         }

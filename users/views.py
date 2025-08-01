@@ -6,6 +6,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from .serializers import UserRegistrationSerializer, LoginSerializer, UserListSerializer, UserDetailSerializer, UserUpdateSerializer
 from .permissions import IsAdminOrSuperUser, IsOwnerOrReadOnly, UserDetailPermission
 
@@ -99,8 +100,9 @@ def refresh_token(request):
         
         # Generate new access token
         new_access_token = refresh.access_token
-        # Add role to new access token
-        new_access_token['role'] = user.role
+        # Add user info to new access token
+        new_access_token['is_admin'] = user.is_admin
+        new_access_token['is_superuser'] = user.is_superuser
         
         return Response({
             'access': str(new_access_token)
@@ -110,3 +112,35 @@ def refresh_token(request):
         return Response({'detail': 'Invalid refresh token.'}, status=status.HTTP_400_BAD_REQUEST)
     except User.DoesNotExist:
         return Response({'detail': 'User not found.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def assign_roles(request):
+    # Only superuser can assign roles
+    if not (request.user and request.user.is_authenticated and request.user.is_superuser):
+        return Response({'detail': 'Only superuser can assign roles.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    user_id = request.data.get('user_id')
+    group_id = request.data.get('group_id')
+    
+    if not user_id or not group_id:
+        return Response({'detail': 'user_id and group_id are required.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+    
+    try:
+        group = Group.objects.get(id=group_id)
+    except Group.DoesNotExist:
+        return Response({'detail': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Add user to group
+    user.groups.add(group)
+    
+    return Response({
+        'detail': f'User {user.username} has been assigned to group {group.name}.',
+        'user_id': str(user.id),
+        'group_id': str(group.id)
+    }, status=status.HTTP_200_OK)

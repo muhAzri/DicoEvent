@@ -13,7 +13,7 @@ class UserManager(BaseUserManager):
         return user
 
     def create_superuser(self, username, password=None, **extra_fields):
-        extra_fields.setdefault('role', 'superuser')
+        extra_fields.setdefault('is_superuser', True)
         return self.create_user(username, password, **extra_fields)
 
 
@@ -23,19 +23,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(blank=True, null=True)
     first_name = models.CharField(max_length=150, blank=True, null=True)
     last_name = models.CharField(max_length=150, blank=True, null=True)
-    
-    ROLE_CHOICES = [
-        ('user', 'User'),
-        ('admin', 'Admin'),
-        ('superuser', 'SuperUser'),
-    ]
-    
-    role = models.CharField(
-        max_length=10,
-        choices=ROLE_CHOICES,
-        default='user'
-    )
-    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -45,16 +32,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = []
     
     def __str__(self):
-        return f"{self.username} ({self.role})"
+        return self.username
     
     @property
     def is_staff(self):
-        return self.role in ['admin', 'superuser']
+        return self.is_admin or self.is_superuser
     
     @property
     def is_admin(self):
-        return self.role == 'admin'
-    
-    @property
-    def is_super_user(self):
-        return self.role == 'superuser'
+        return self.groups.filter(name='admin').exists()
