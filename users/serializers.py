@@ -58,3 +58,18 @@ class LoginSerializer(serializers.Serializer):
             'refresh': str(refresh),
             'access': str(access),
         }
+
+
+class UserListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'role', 'created_at', 'updated_at')
+        
+    def to_representation(self, instance):
+        return {
+            'id': str(instance.id),
+            'username': instance.username,
+            'role': instance.role,
+            'created_at': instance.created_at.isoformat(),
+            'updated_at': instance.updated_at.isoformat(),
+        }
