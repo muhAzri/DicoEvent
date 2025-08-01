@@ -3,6 +3,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.contrib.auth import get_user_model
 from .serializers import UserRegistrationSerializer, LoginSerializer, UserListSerializer, UserDetailSerializer, UserUpdateSerializer
 from .permissions import IsAdminOrSuperUser, IsOwnerOrReadOnly, UserDetailPermission
@@ -82,3 +84,29 @@ def login(request):
         tokens = serializer.save()
         return Response(tokens, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def refresh_token(request):
+    refresh_token = request.data.get('refresh')
+    
+    if not refresh_token:
+        return Response({'detail': 'Refresh token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        refresh = RefreshToken(refresh_token)
+        user = User.objects.get(id=refresh['user_id'])
+        
+        # Generate new access token
+        new_access_token = refresh.access_token
+        # Add role to new access token
+        new_access_token['role'] = user.role
+        
+        return Response({
+            'access': str(new_access_token)
+        }, status=status.HTTP_200_OK)
+        
+    except (InvalidToken, TokenError):
+        return Response({'detail': 'Invalid refresh token.'}, status=status.HTTP_400_BAD_REQUEST)
+    except User.DoesNotExist:
+        return Response({'detail': 'User not found.'}, status=status.HTTP_400_BAD_REQUEST)
