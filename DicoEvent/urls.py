@@ -22,4 +22,5 @@ urlpatterns = [
     path('api/users/', include('users.urls')),
     path('api/', include('users.urls')),
     path('api/token/', include('tokens.urls')),
+    path('api/groups/', include('groups.urls')),
 ]
