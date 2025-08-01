@@ -73,3 +73,17 @@ class UserListSerializer(serializers.ModelSerializer):
             'created_at': instance.created_at.isoformat(),
             'updated_at': instance.updated_at.isoformat(),
         }
+
+
+class UserDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('username', 'email', 'first_name', 'last_name')
+        
+    def to_representation(self, instance):
+        return {
+            'username': instance.username or '',
+            'email': instance.email or '',
+            'first_name': instance.first_name or '',
+            'last_name': instance.last_name or '',
+        }
