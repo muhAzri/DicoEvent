@@ -24,4 +24,5 @@ urlpatterns = [
     path('api/token/', include('tokens.urls')),
     path('api/groups/', include('groups.urls')),
     path('api/events/', include('events.urls')),
+    path('api/tickets/', include('tickets.urls')),
 ]
