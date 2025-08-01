@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import get_user_model
 from .serializers import UserRegistrationSerializer, LoginSerializer, UserListSerializer, UserDetailSerializer, UserUpdateSerializer
-from .permissions import IsAdminOrSuperUser, IsOwnerOrReadOnly
+from .permissions import IsAdminOrSuperUser, IsOwnerOrReadOnly, UserDetailPermission
 
 User = get_user_model()
 
@@ -32,7 +32,7 @@ class UsersView(APIView):
 
 
 class UserDetailView(APIView):
-    permission_classes = [IsOwnerOrReadOnly]
+    permission_classes = [UserDetailPermission]
     
     def get_object(self, user_id):
         try:
@@ -62,6 +62,17 @@ class UserDetailView(APIView):
             response_serializer = UserDetailSerializer(updated_user)
             return Response(response_serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request, user_id):
+        user = self.get_object(user_id)
+        if user is None:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check object permission
+        self.check_object_permissions(request, user)
+        
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(['POST'])
