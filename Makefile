@@ -1,4 +1,4 @@
-.PHONY: help install shell run migrate makemigrations createsuperuser test lint format clean
+.PHONY: help install shell run migrate makemigrations createsuperuser test lint format clean db-start db-stop db-reset
 
 help:
 	@echo "Available commands:"
@@ -12,6 +12,9 @@ help:
 	@echo "  lint           - Check code formatting with black"
 	@echo "  format         - Format code with black"
 	@echo "  clean          - Remove cache files"
+	@echo "  db-start       - Start PostgreSQL service"
+	@echo "  db-stop        - Stop PostgreSQL service"
+	@echo "  db-reset       - Reset database (migrate from scratch)"
 
 install:
 	pipenv install --dev
@@ -44,3 +47,12 @@ clean:
 	find . -type f -name "*.pyc" -delete
 	find . -type d -name "__pycache__" -delete
 	find . -type d -name "*.egg-info" -exec rm -rf {} +
+
+db-start:
+	brew services start postgresql@17
+
+db-stop:
+	brew services stop postgresql@17
+
+db-reset:
+	pipenv run python manage.py migrate
