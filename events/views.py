@@ -2,6 +2,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from users.permissions import IsAdminOrSuperUser
 from .models import Event
 from .serializers import EventCreateSerializer, EventListSerializer, EventUpdateSerializer
@@ -14,10 +15,37 @@ class EventsView(APIView):
         return [IsAdminOrSuperUser()]
     
     def get(self, request):
-        events = Event.objects.all()
-        serializer = EventListSerializer(events, many=True)
+        events = Event.objects.all().order_by('-created_at')
+        
+        # Get page number from query params
+        page_number = request.GET.get('page', 1)
+        page_size = 10  # Events per page
+        
+        # Create paginator
+        paginator = Paginator(events, page_size)
+        
+        try:
+            page_obj = paginator.page(page_number)
+        except PageNotAnInteger:
+            page_obj = paginator.page(1)
+        except EmptyPage:
+            page_obj = paginator.page(paginator.num_pages)
+        
+        # Serialize paginated data
+        serializer = EventListSerializer(page_obj, many=True)
+        
         return Response({
-            'events': serializer.data
+            'events': serializer.data,
+            'pagination': {
+                'page': page_obj.number,
+                'pages': paginator.num_pages,
+                'per_page': page_size,
+                'total': paginator.count,
+                'has_next': page_obj.has_next(),
+                'has_previous': page_obj.has_previous(),
+                'next_page': page_obj.next_page_number() if page_obj.has_next() else None,
+                'previous_page': page_obj.previous_page_number() if page_obj.has_previous() else None
+            }
         }, status=status.HTTP_200_OK)
     
     def post(self, request):
