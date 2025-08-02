@@ -6,7 +6,6 @@ from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group as DjangoGroup
 from groups.models import Group as CustomGroup
 from .serializers import UserRegistrationSerializer, LoginSerializer, UserListSerializer, UserDetailSerializer, UserUpdateSerializer
 from .permissions import IsAdminOrSuperUser, IsOwnerOrReadOnly, UserDetailPermission
@@ -135,15 +134,11 @@ def assign_roles(request):
     try:
         # Look for group in custom groups_group table
         custom_group = CustomGroup.objects.get(id=group_id)
-        
-        # Find or create corresponding Django group
-        django_group, created = DjangoGroup.objects.get_or_create(name=custom_group.name)
-        
     except CustomGroup.DoesNotExist:
         return Response({'detail': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
     
-    # Add user to Django group (for authentication system)
-    user.groups.add(django_group)
+    # Add user to custom group (using overridden groups field)
+    user.groups.add(custom_group)
     
     return Response({
         'detail': f'User {user.username} has been assigned to group {custom_group.name}.',
