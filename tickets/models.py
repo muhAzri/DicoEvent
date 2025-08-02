@@ -5,7 +5,7 @@ import uuid
 
 class Ticket(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='tickets')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="tickets")
     name = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     sales_start = models.DateTimeField()
@@ -13,9 +13,9 @@ class Ticket(models.Model):
     quota = models.PositiveIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     def __str__(self):
         return f"{self.name} - {self.event.name}"
-    
+
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
