@@ -1,10 +1,2 @@
-from django.db import models
-
-
-class Group(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return self.name
+# This app uses Django's built-in Group model from django.contrib.auth.models
+# No custom models needed - all group operations use auth_group table
