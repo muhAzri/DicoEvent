@@ -1,8 +1,7 @@
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
-from users.permissions import IsAdminOrSuperUser
+from users.permissions import IsAdminOrSuperUser, IsAuthenticatedUser
 from .models import Payment
 from .serializers import PaymentCreateSerializer, PaymentListSerializer, PaymentDetailSerializer, PaymentUpdateSerializer
 
@@ -11,7 +10,7 @@ class PaymentsView(APIView):
     def get_permissions(self):
         if self.request.method == 'GET':
             return [IsAdminOrSuperUser()]
-        return [AllowAny()]
+        return [IsAuthenticatedUser()]
     
     def get(self, request):
         payments = Payment.objects.all()
@@ -31,7 +30,7 @@ class PaymentsView(APIView):
 class PaymentDetailView(APIView):
     def get_permissions(self):
         if self.request.method == 'GET':
-            return [AllowAny()]
+            return [IsAuthenticatedUser()]
         return [IsAdminOrSuperUser()]
     
     def get_object(self, payment_id):

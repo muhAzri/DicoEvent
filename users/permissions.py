@@ -59,3 +59,41 @@ class UserDetailPermission(BasePermission):
             return True
         # PUT/PATCH only allow users to update their own profile
         return obj.id == request.user.id
+
+
+class IsOrganizerOwnerOrAdmin(BasePermission):
+    """
+    Custom permission for events:
+    - Organizers can only edit/delete their own events
+    - Admins and superusers can edit/delete any event
+    """
+    def has_permission(self, request, view):
+        if request.method in ['GET']:
+            return True
+        return (
+            request.user and 
+            request.user.is_authenticated and 
+            (request.user.is_organizer or request.user.is_admin or request.user.is_superuser)
+        )
+    
+    def has_object_permission(self, request, view, obj):
+        if request.method in ['GET']:
+            return True
+        
+        # Admin and superuser can access any event
+        if request.user.is_admin or request.user.is_superuser:
+            return True
+        
+        # Organizers can only access their own events
+        if request.user.is_organizer:
+            return obj.organizer == request.user
+        
+        return False
+
+
+class IsAuthenticatedUser(BasePermission):
+    """
+    Permission for regular users to create registrations and payments
+    """
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated

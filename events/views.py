@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from users.permissions import IsAdminOrSuperUser, IsOrganizerAdminOrSuperUser
+from users.permissions import IsAdminOrSuperUser, IsOrganizerAdminOrSuperUser, IsOrganizerOwnerOrAdmin
 from .models import Event
 from .serializers import EventCreateSerializer, EventListSerializer, EventUpdateSerializer
 
@@ -57,10 +57,7 @@ class EventsView(APIView):
 
 
 class EventDetailView(APIView):
-    def get_permissions(self):
-        if self.request.method == 'GET':
-            return [AllowAny()]
-        return [IsOrganizerAdminOrSuperUser()]
+    permission_classes = [IsOrganizerOwnerOrAdmin]
     
     def get_object(self, event_id):
         try:
