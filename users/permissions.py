@@ -10,6 +10,15 @@ class IsAdminOrSuperUser(BasePermission):
         )
 
 
+class IsOrganizerAdminOrSuperUser(BasePermission):
+    def has_permission(self, request, view):
+        return (
+            request.user and 
+            request.user.is_authenticated and 
+            (request.user.is_organizer or request.user.is_admin or request.user.is_superuser)
+        )
+
+
 class IsOwnerOrReadOnly(BasePermission):
     def has_permission(self, request, view):
         # Allow GET requests without authentication

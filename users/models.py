@@ -26,6 +26,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    
     objects = UserManager()
     
     USERNAME_FIELD = 'username'
@@ -41,3 +42,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_admin(self):
         return self.groups.filter(name='admin').exists()
+    
+    @property
+    def is_organizer(self):
+        return self.groups.filter(name='organizer').exists()
+    

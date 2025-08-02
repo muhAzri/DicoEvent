@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from users.permissions import IsAdminOrSuperUser
+from users.permissions import IsAdminOrSuperUser, IsOrganizerAdminOrSuperUser
 from .models import Event
 from .serializers import EventCreateSerializer, EventListSerializer, EventUpdateSerializer
 
@@ -12,7 +12,7 @@ class EventsView(APIView):
     def get_permissions(self):
         if self.request.method == 'GET':
             return [AllowAny()]
-        return [IsAdminOrSuperUser()]
+        return [IsOrganizerAdminOrSuperUser()]
     
     def get(self, request):
         events = Event.objects.all().order_by('-created_at')
@@ -60,7 +60,7 @@ class EventDetailView(APIView):
     def get_permissions(self):
         if self.request.method == 'GET':
             return [AllowAny()]
-        return [IsAdminOrSuperUser()]
+        return [IsOrganizerAdminOrSuperUser()]
     
     def get_object(self, event_id):
         try:
