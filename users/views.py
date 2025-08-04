@@ -7,6 +7,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.cache import cache
+from django.conf import settings
 from .serializers import (
     UserRegistrationSerializer,
     LoginSerializer,
@@ -26,14 +28,37 @@ class UsersView(APIView):
         return [AllowAny()]
 
     def get(self, request):
+        # Try to get from cache first
+        cache_key = "users_list"
+        cached_data = cache.get(cache_key)
+        
+        if cached_data:
+            # Return cached data with X-Data-Source header
+            response = Response(cached_data, status=status.HTTP_200_OK)
+            response['X-Data-Source'] = 'cache'
+            return response
+        
+        # If not in cache, get from database
         users = User.objects.all()
         serializer = UserListSerializer(users, many=True)
-        return Response({"users": serializer.data}, status=status.HTTP_200_OK)
+        data = {"users": serializer.data}
+        
+        # Cache the data for 1 hour
+        cache.set(cache_key, data, settings.CACHE_TTL)
+        
+        # Return fresh data with X-Data-Source header
+        response = Response(data, status=status.HTTP_200_OK)
+        response['X-Data-Source'] = 'database'
+        return response
 
     def post(self, request):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
+            
+            # Invalidate users list cache
+            cache.delete("users_list")
+            
             return Response(
                 serializer.to_representation(user), status=status.HTTP_201_CREATED
             )
@@ -50,6 +75,17 @@ class UserDetailView(APIView):
             return None
 
     def get(self, request, user_id):
+        # Try to get from cache first
+        cache_key = f"user_detail_{user_id}"
+        cached_data = cache.get(cache_key)
+        
+        if cached_data:
+            # Return cached data with X-Data-Source header
+            response = Response(cached_data, status=status.HTTP_200_OK)
+            response['X-Data-Source'] = 'cache'
+            return response
+        
+        # If not in cache, get from database
         user = self.get_object(user_id)
         if user is None:
             return Response(
@@ -57,7 +93,15 @@ class UserDetailView(APIView):
             )
 
         serializer = UserDetailSerializer(user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        data = serializer.data
+        
+        # Cache the data for 1 hour
+        cache.set(cache_key, data, settings.CACHE_TTL)
+        
+        # Return fresh data with X-Data-Source header
+        response = Response(data, status=status.HTTP_200_OK)
+        response['X-Data-Source'] = 'database'
+        return response
 
     def put(self, request, user_id):
         user = self.get_object(user_id)
@@ -72,6 +116,12 @@ class UserDetailView(APIView):
         serializer = UserUpdateSerializer(user, data=request.data)
         if serializer.is_valid():
             updated_user = serializer.save()
+            
+            # Invalidate cache for this specific user detail
+            cache.delete(f"user_detail_{user_id}")
+            # Invalidate users list cache
+            cache.delete("users_list")
+            
             response_serializer = UserDetailSerializer(updated_user)
             return Response(response_serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -87,6 +137,12 @@ class UserDetailView(APIView):
         self.check_object_permissions(request, user)
 
         user.delete()
+        
+        # Invalidate cache for this specific user detail
+        cache.delete(f"user_detail_{user_id}")
+        # Invalidate users list cache
+        cache.delete("users_list")
+        
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

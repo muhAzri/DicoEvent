@@ -1,6 +1,8 @@
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.core.cache import cache
+from django.conf import settings
 from users.permissions import IsAdminOrSuperUser, IsAuthenticatedUser
 from .models import Payment
 from .serializers import (
@@ -18,14 +20,37 @@ class PaymentsView(APIView):
         return [IsAuthenticatedUser()]
 
     def get(self, request):
+        # Try to get from cache first
+        cache_key = "payments_list"
+        cached_data = cache.get(cache_key)
+        
+        if cached_data:
+            # Return cached data with X-Data-Source header
+            response = Response(cached_data, status=status.HTTP_200_OK)
+            response['X-Data-Source'] = 'cache'
+            return response
+        
+        # If not in cache, get from database
         payments = Payment.objects.all()
         serializer = PaymentListSerializer(payments, many=True)
-        return Response({"payments": serializer.data}, status=status.HTTP_200_OK)
+        data = {"payments": serializer.data}
+        
+        # Cache the data for 1 hour
+        cache.set(cache_key, data, settings.CACHE_TTL)
+        
+        # Return fresh data with X-Data-Source header
+        response = Response(data, status=status.HTTP_200_OK)
+        response['X-Data-Source'] = 'database'
+        return response
 
     def post(self, request):
         serializer = PaymentCreateSerializer(data=request.data)
         if serializer.is_valid():
             payment = serializer.save()
+            
+            # Invalidate payments list cache
+            cache.delete("payments_list")
+            
             return Response(
                 serializer.to_representation(payment), status=status.HTTP_201_CREATED
             )
@@ -45,6 +70,17 @@ class PaymentDetailView(APIView):
             return None
 
     def get(self, request, payment_id):
+        # Try to get from cache first
+        cache_key = f"payment_detail_{payment_id}"
+        cached_data = cache.get(cache_key)
+        
+        if cached_data:
+            # Return cached data with X-Data-Source header
+            response = Response(cached_data, status=status.HTTP_200_OK)
+            response['X-Data-Source'] = 'cache'
+            return response
+        
+        # If not in cache, get from database
         payment = self.get_object(payment_id)
         if payment is None:
             return Response(
@@ -52,7 +88,15 @@ class PaymentDetailView(APIView):
             )
 
         serializer = PaymentDetailSerializer(payment)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        data = serializer.data
+        
+        # Cache the data for 1 hour
+        cache.set(cache_key, data, settings.CACHE_TTL)
+        
+        # Return fresh data with X-Data-Source header
+        response = Response(data, status=status.HTTP_200_OK)
+        response['X-Data-Source'] = 'database'
+        return response
 
     def put(self, request, payment_id):
         payment = self.get_object(payment_id)
@@ -64,6 +108,12 @@ class PaymentDetailView(APIView):
         serializer = PaymentUpdateSerializer(payment, data=request.data)
         if serializer.is_valid():
             updated_payment = serializer.save()
+            
+            # Invalidate cache for this specific payment detail
+            cache.delete(f"payment_detail_{payment_id}")
+            # Invalidate payments list cache
+            cache.delete("payments_list")
+            
             response_serializer = PaymentDetailSerializer(updated_payment)
             return Response(response_serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -76,4 +126,10 @@ class PaymentDetailView(APIView):
             )
 
         payment.delete()
+        
+        # Invalidate cache for this specific payment detail
+        cache.delete(f"payment_detail_{payment_id}")
+        # Invalidate payments list cache
+        cache.delete("payments_list")
+        
         return Response(status=status.HTTP_204_NO_CONTENT)

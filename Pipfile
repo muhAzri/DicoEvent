@@ -11,6 +11,7 @@ djangorestframework-simplejwt = "*"
 minio = "*"
 pillow = "*"
 psycopg2-binary = "*"
+django-redis = "*"
 
 [dev-packages]
 black = "*"

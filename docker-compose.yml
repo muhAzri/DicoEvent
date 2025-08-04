@@ -34,6 +34,18 @@ services:
       timeout: 20s
       retries: 3
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   web:
     build: .
     command: >
@@ -51,17 +63,21 @@ services:
       - DATABASE_NAME=dicoevent
       - DATABASE_USER=postgres
       - DATABASE_PASSWORD=postgres
-      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ENDPOINT_URL=minio:9000
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET_NAME=dicoevent-uploads
       - MINIO_USE_SSL=False
+      - REDIS_HOST=redis
     depends_on:
       db:
         condition: service_healthy
       minio:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:
   minio_data:
+  redis_data:
