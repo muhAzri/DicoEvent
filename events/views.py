@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
 from django.conf import settings
+from loguru import logger
 from users.permissions import (
     IsAdminOrSuperUser,
     IsOrganizerAdminOrSuperUser,
@@ -27,76 +28,103 @@ class EventsView(APIView):
         return [IsOrganizerAdminOrSuperUser()]
 
     def get(self, request):
+        logger.info(f"GET /events - User: {getattr(request.user, 'username', 'anonymous')} - Page: {request.GET.get('page', 1)}")
+        
         # Get page number from query params
         page_number = request.GET.get("page", 1)
         page_size = 10  # Events per page
         
-        # Try to get from cache first
-        cache_key = f"events_list_page_{page_number}"
-        cached_data = cache.get(cache_key)
-        
-        if cached_data:
-            # Return cached data with X-Data-Source header
-            response = Response(cached_data, status=status.HTTP_200_OK)
-            response['X-Data-Source'] = 'cache'
-            return response
-        
-        # If not in cache, get from database
-        events = Event.objects.all().order_by("-created_at")
-
-        # Create paginator
-        paginator = Paginator(events, page_size)
-
         try:
-            page_obj = paginator.page(page_number)
-        except PageNotAnInteger:
-            page_obj = paginator.page(1)
-        except EmptyPage:
-            page_obj = paginator.page(paginator.num_pages)
+            # Try to get from cache first
+            cache_key = f"events_list_page_{page_number}"
+            cached_data = cache.get(cache_key)
+            
+            if cached_data:
+                logger.info(f"Events list page {page_number} served from cache")
+                # Return cached data with X-Data-Source header
+                response = Response(cached_data, status=status.HTTP_200_OK)
+                response['X-Data-Source'] = 'cache'
+                return response
+            
+            # If not in cache, get from database
+            events = Event.objects.all().order_by("-created_at")
 
-        # Serialize paginated data
-        serializer = EventListSerializer(page_obj, many=True)
+            # Create paginator
+            paginator = Paginator(events, page_size)
 
-        data = {
-            "events": serializer.data,
-            "pagination": {
-                "page": page_obj.number,
-                "pages": paginator.num_pages,
-                "per_page": page_size,
-                "total": paginator.count,
-                "has_next": page_obj.has_next(),
-                "has_previous": page_obj.has_previous(),
-                "next_page": (
-                    page_obj.next_page_number() if page_obj.has_next() else None
-                ),
-                "previous_page": (
-                    page_obj.previous_page_number()
-                    if page_obj.has_previous()
-                    else None
-                ),
-            },
-        }
-        
-        # Cache the data for 1 hour
-        cache.set(cache_key, data, settings.CACHE_TTL)
-        
-        # Return fresh data with X-Data-Source header
-        response = Response(data, status=status.HTTP_200_OK)
-        response['X-Data-Source'] = 'database'
-        return response
+            try:
+                page_obj = paginator.page(page_number)
+            except PageNotAnInteger:
+                page_obj = paginator.page(1)
+                logger.warning(f"Invalid page number '{page_number}', defaulting to page 1")
+            except EmptyPage:
+                page_obj = paginator.page(paginator.num_pages)
+                logger.warning(f"Page {page_number} is empty, serving last page {paginator.num_pages}")
+
+            # Serialize paginated data
+            serializer = EventListSerializer(page_obj, many=True)
+
+            data = {
+                "events": serializer.data,
+                "pagination": {
+                    "page": page_obj.number,
+                    "pages": paginator.num_pages,
+                    "per_page": page_size,
+                    "total": paginator.count,
+                    "has_next": page_obj.has_next(),
+                    "has_previous": page_obj.has_previous(),
+                    "next_page": (
+                        page_obj.next_page_number() if page_obj.has_next() else None
+                    ),
+                    "previous_page": (
+                        page_obj.previous_page_number()
+                        if page_obj.has_previous()
+                        else None
+                    ),
+                },
+            }
+            
+            # Cache the data for 1 hour
+            cache.set(cache_key, data, settings.CACHE_TTL)
+            logger.info(f"Events list page {page_number} cached successfully - Total events: {paginator.count}")
+            
+            # Return fresh data with X-Data-Source header
+            response = Response(data, status=status.HTTP_200_OK)
+            response['X-Data-Source'] = 'database'
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error retrieving events list: {str(e)}")
+            return Response(
+                {"error": "Failed to retrieve events"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def post(self, request):
-        serializer = EventCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            event = serializer.save()
-            
-            # Invalidate cache for events list (all pages)
-            self._invalidate_events_cache()
-            
+        logger.info(f"POST /events - User: {getattr(request.user, 'username', 'anonymous')} - Creating new event")
+        
+        try:
+            serializer = EventCreateSerializer(data=request.data)
+            if serializer.is_valid():
+                event = serializer.save()
+                
+                # Invalidate cache for events list (all pages)
+                self._invalidate_events_cache()
+                
+                logger.info(f"Event {event.id} created successfully by {getattr(request.user, 'username', 'anonymous')}")
+                return Response(
+                    serializer.to_representation(event), status=status.HTTP_201_CREATED
+                )
+            else:
+                logger.warning(f"Event creation failed - Validation errors: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"Error creating event: {str(e)}")
             return Response(
-                serializer.to_representation(event), status=status.HTTP_201_CREATED
+                {"error": "Failed to create event"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
     def _invalidate_events_cache(self):
         """Invalidate all events list cache pages."""

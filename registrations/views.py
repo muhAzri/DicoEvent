@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.core.cache import cache
 from django.conf import settings
+from loguru import logger
 from users.permissions import IsAdminOrSuperUser, IsAuthenticatedUser
 from .models import Registration
 from .serializers import (
@@ -44,18 +45,31 @@ class RegistrationsView(APIView):
         return response
 
     def post(self, request):
-        serializer = RegistrationCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            registration = serializer.save()
-            
-            # Invalidate registrations list cache
-            cache.delete("registrations_list")
-            
+        logger.info(f"POST /registrations - User: {getattr(request.user, 'username', 'anonymous')} - Creating new registration")
+        
+        try:
+            serializer = RegistrationCreateSerializer(data=request.data)
+            if serializer.is_valid():
+                registration = serializer.save()
+                
+                # Invalidate registrations list cache
+                cache.delete("registrations_list")
+                
+                logger.info(f"Registration {registration.id} created successfully by {getattr(request.user, 'username', 'anonymous')}")
+                return Response(
+                    serializer.to_representation(registration),
+                    status=status.HTTP_201_CREATED,
+                )
+            else:
+                logger.warning(f"Registration creation failed - Validation errors: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"Error creating registration: {str(e)}")
             return Response(
-                serializer.to_representation(registration),
-                status=status.HTTP_201_CREATED,
+                {"error": "Failed to create registration"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class RegistrationDetailView(APIView):

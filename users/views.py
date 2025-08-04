@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.conf import settings
+from loguru import logger
 from .serializers import (
     UserRegistrationSerializer,
     LoginSerializer,
@@ -52,17 +53,30 @@ class UsersView(APIView):
         return response
 
     def post(self, request):
-        serializer = UserRegistrationSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            
-            # Invalidate users list cache
-            cache.delete("users_list")
-            
+        logger.info(f"POST /users - Attempting user registration")
+        
+        try:
+            serializer = UserRegistrationSerializer(data=request.data)
+            if serializer.is_valid():
+                user = serializer.save()
+                
+                # Invalidate users list cache
+                cache.delete("users_list")
+                
+                logger.info(f"User {user.username} registered successfully")
+                return Response(
+                    serializer.to_representation(user), status=status.HTTP_201_CREATED
+                )
+            else:
+                logger.warning(f"User registration failed - Validation errors: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"Error during user registration: {str(e)}")
             return Response(
-                serializer.to_representation(user), status=status.HTTP_201_CREATED
+                {"error": "Registration failed"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserDetailView(APIView):
@@ -148,11 +162,28 @@ class UserDetailView(APIView):
 
 @api_view(["POST"])
 def login(request):
-    serializer = LoginSerializer(data=request.data)
-    if serializer.is_valid():
-        tokens = serializer.save()
-        return Response(tokens, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    logger.info(f"POST /login - Login attempt from IP: {request.META.get('REMOTE_ADDR', 'unknown')}")
+    
+    try:
+        serializer = LoginSerializer(data=request.data)
+        if serializer.is_valid():
+            tokens = serializer.save()
+            
+            # Get username from serializer context
+            username = getattr(serializer, 'validated_data', {}).get('username', 'unknown')
+            logger.info(f"User {username} logged in successfully")
+            
+            return Response(tokens, status=status.HTTP_200_OK)
+        else:
+            logger.warning(f"Login failed - Validation errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        logger.error(f"Error during login: {str(e)}")
+        return Response(
+            {"error": "Login failed"}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(["POST"])

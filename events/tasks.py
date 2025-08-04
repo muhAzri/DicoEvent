@@ -3,11 +3,9 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
+from loguru import logger
 from .models import Event
 from registrations.models import Registration
-import logging
-
-logger = logging.getLogger(__name__)
 
 @shared_task
 def send_event_reminder_email(user_email, user_name, event_name, event_start_time, event_location):

@@ -59,6 +59,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "DicoEvent.middleware.LoggingMiddleware",
 ]
 
 ROOT_URLCONF = "DicoEvent.urls"
@@ -199,3 +200,10 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('MAIL_USER')
 EMAIL_HOST_PASSWORD = os.getenv('MAIL_PASSWORD')
 DEFAULT_FROM_EMAIL = os.getenv('MAIL_USER')
+
+# Logging Configuration
+LOGGING_ENABLED = True
+
+# Import and configure Loguru
+from .logging_config import configure_logging, get_logger
+app_logger = configure_logging()
