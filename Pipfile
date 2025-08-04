@@ -12,6 +12,8 @@ minio = "*"
 pillow = "*"
 psycopg2-binary = "*"
 django-redis = "*"
+celery = "*"
+redis = "*"
 
 [dev-packages]
 black = "*"

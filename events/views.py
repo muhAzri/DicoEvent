@@ -17,6 +17,7 @@ from .serializers import (
     EventUpdateSerializer,
     EventPosterUploadSerializer,
 )
+from .tasks import send_event_reminders
 
 
 class EventsView(APIView):
@@ -262,3 +263,23 @@ class EventPosterView(APIView):
                 {"detail": "Event not found."}, 
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+class SendEventRemindersView(APIView):
+    permission_classes = [IsAdminOrSuperUser]
+    
+    def post(self, request):
+        """Manually trigger event reminder emails."""
+        try:
+            # Trigger the Celery task
+            task = send_event_reminders.delay()
+            
+            return Response({
+                "message": "Event reminder task has been queued successfully",
+                "task_id": task.id
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                "error": f"Failed to queue reminder task: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -69,6 +69,11 @@ services:
       - MINIO_BUCKET_NAME=dicoevent-uploads
       - MINIO_USE_SSL=False
       - REDIS_HOST=redis
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - MAIL_HOST=smtp.gmail.com
+      - MAIL_PORT=587
+      - MAIL_USER=your-email@gmail.com
+      - MAIL_PASSWORD=your-app-password
     depends_on:
       db:
         condition: service_healthy
@@ -76,6 +81,70 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  celery_worker:
+    build: .
+    command: celery -A DicoEvent worker --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-h!c$_r@w%ab*k&7&&3c6)kjt!j1jub*_wa^jt_u22ahwx^o@oi
+      - DATABASE_HOST=db
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=dicoevent
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres
+      - MINIO_ENDPOINT_URL=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=dicoevent-uploads
+      - MINIO_USE_SSL=False
+      - REDIS_HOST=redis
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - MAIL_HOST=smtp.gmail.com
+      - MAIL_PORT=587
+      - MAIL_USER=your-email@gmail.com
+      - MAIL_PASSWORD=your-app-password
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+
+  celery_beat:
+    build: .
+    command: celery -A DicoEvent beat --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-h!c$_r@w%ab*k&7&&3c6)kjt!j1jub*_wa^jt_u22ahwx^o@oi
+      - DATABASE_HOST=db
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=dicoevent
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres
+      - MINIO_ENDPOINT_URL=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=dicoevent-uploads
+      - MINIO_USE_SSL=False
+      - REDIS_HOST=redis
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - MAIL_HOST=smtp.gmail.com
+      - MAIL_PORT=587
+      - MAIL_USER=your-email@gmail.com
+      - MAIL_PASSWORD=your-app-password
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
 
 volumes:
   postgres_data:
