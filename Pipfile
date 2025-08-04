@@ -8,6 +8,9 @@ django = "*"
 djangorestframework = "*"
 python-dotenv = "*"
 djangorestframework-simplejwt = "*"
+minio = "*"
+pillow = "*"
+psycopg2-binary = "*"
 
 [dev-packages]
 black = "*"

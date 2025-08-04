@@ -1,6 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from PIL import Image
 from .models import Event
+from .services import minio_service
 
 User = get_user_model()
 
@@ -124,3 +127,66 @@ class EventUpdateSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+
+
+class EventPosterUploadSerializer(serializers.Serializer):
+    image = serializers.ImageField(required=True)
+    event = serializers.UUIDField(required=True)
+
+    def validate_image(self, value):
+        """Validate image file type and size."""
+        # Check file size (max 500KB)
+        max_size = 500 * 1024  # 500KB in bytes
+        if value.size > max_size:
+            raise serializers.ValidationError(
+                f"File size too large. Maximum size is 500KB. Current size: {value.size / 1024:.1f}KB"
+            )
+
+        # Check MIME type
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+        if value.content_type not in allowed_types:
+            raise serializers.ValidationError(
+                f"Invalid file type. Allowed types: {', '.join(allowed_types)}"
+            )
+
+        # Validate image using PIL
+        try:
+            image = Image.open(value)
+            image.verify()
+        except Exception as e:
+            raise serializers.ValidationError("Invalid image file or corrupted image.")
+
+        return value
+
+    def validate_event(self, value):
+        """Validate that event exists."""
+        try:
+            event = Event.objects.get(id=value)
+            return value
+        except Event.DoesNotExist:
+            raise serializers.ValidationError("Event not found.")
+
+    def create(self, validated_data):
+        """Upload image to MinIO and return the result.""" 
+        image = validated_data['image']
+        event_id = validated_data['event']
+        
+        try:
+            # Get the event object
+            event = Event.objects.get(id=event_id)
+            
+            # Upload to MinIO
+            filename = minio_service.upload_file(image, folder="event-posters")
+            
+            # Save poster filename to event
+            event.poster = filename
+            event.save()
+            
+            return {
+                'id': str(event_id),
+                'image': filename
+            }
+        except ValidationError as e:
+            raise serializers.ValidationError(str(e))
+        except Exception as e:
+            raise serializers.ValidationError(f"Upload failed: {str(e)}")

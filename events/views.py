@@ -13,6 +13,7 @@ from .serializers import (
     EventCreateSerializer,
     EventListSerializer,
     EventUpdateSerializer,
+    EventPosterUploadSerializer,
 )
 
 
@@ -117,3 +118,65 @@ class EventDetailView(APIView):
 
         event.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class EventPosterUploadView(APIView):
+    permission_classes = [IsOrganizerAdminOrSuperUser]
+    
+    def post(self, request):
+        """Upload event poster."""
+        serializer = EventPosterUploadSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            try:
+                result = serializer.save()
+                return Response(result, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response(
+                    {"error": f"Upload failed: {str(e)}"}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class EventPosterView(APIView):
+    permission_classes = [AllowAny]
+    
+    def get(self, request, event_id):
+        """Get event poster URL."""
+        try:
+            event = Event.objects.get(id=event_id)
+            
+            if not event.poster:
+                return Response(
+                    {"detail": "Event poster not found."}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Generate presigned URL for the poster
+            try:
+                from .services import minio_service
+                poster_url = minio_service.get_file_url(
+                    event.poster, 
+                    folder="event-posters",
+                    expires=3600  # 1 hour
+                )
+                
+                return Response({
+                    "event_id": str(event.id),
+                    "poster_url": poster_url,
+                    "filename": event.poster
+                }, status=status.HTTP_200_OK)
+                
+            except Exception as e:
+                return Response(
+                    {"error": f"Failed to generate poster URL: {str(e)}"}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+        except Event.DoesNotExist:
+            return Response(
+                {"detail": "Event not found."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
