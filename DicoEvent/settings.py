@@ -43,12 +43,12 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt",
-    "users",
-    "groups",
-    "events",
-    "tickets",
-    "registrations",
-    "payments",
+    "users.apps.UsersConfig",
+    "groups.apps.GroupsConfig",
+    "events.apps.EventsConfig",
+    "tickets.apps.TicketsConfig",
+    "registrations.apps.RegistrationsConfig",
+    "payments.apps.PaymentsConfig",
 ]
 
 MIDDLEWARE = [
