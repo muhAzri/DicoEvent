@@ -92,3 +92,40 @@ def send_event_reminders():
     except Exception as e:
         logger.error(f"Error in send_event_reminders task: {str(e)}")
         raise e
+
+@shared_task
+def send_reminder_for_new_registration(registration_id):
+    """
+    Send reminder email for new registration if event starts within 2 hours
+    """
+    try:
+        registration = Registration.objects.select_related('user', 'ticket__event').get(id=registration_id)
+        event = registration.ticket.event
+        user = registration.user
+        
+        # Calculate if event starts within 2 hours (with 15 minute buffer)
+        now = timezone.now()
+        time_until_event = event.start_time - now
+        
+        # If event starts within 2 hours and 15 minutes, send reminder
+        if timedelta(hours=1, minutes=45) <= time_until_event <= timedelta(hours=2, minutes=15) and event.status == 'scheduled':
+            send_event_reminder_email.delay(
+                user_email=user.email,
+                user_name=f"{user.first_name} {user.last_name}".strip() or user.username,
+                event_name=event.name,
+                event_start_time=event.start_time.strftime('%Y-%m-%d %H:%M:%S UTC'),
+                event_location=event.location
+            )
+            
+            logger.info(f"Sent immediate reminder to {user.email} for new registration on event {event.name}")
+            return f"Immediate reminder sent to {user.email}"
+        else:
+            logger.info(f"No immediate reminder needed for registration {registration_id} - event not within 2 hour window")
+            return "No reminder needed - event not within 2 hour window"
+            
+    except Registration.DoesNotExist:
+        logger.error(f"Registration {registration_id} not found")
+        return "Registration not found"
+    except Exception as e:
+        logger.error(f"Error sending reminder for new registration {registration_id}: {str(e)}")
+        raise e

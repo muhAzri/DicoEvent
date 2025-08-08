@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from tickets.models import Ticket
 import uuid
 
@@ -23,3 +25,14 @@ class Registration(models.Model):
     class Meta:
         ordering = ["-created_at"]
         unique_together = ["ticket", "user"]  # Prevent duplicate registrations
+
+
+@receiver(post_save, sender=Registration)
+def handle_new_registration(sender, instance, created, **kwargs):
+    """
+    Send reminder email when new registration is created, if event is within 2 hours
+    """
+    if created:  # Only for new registrations
+        from events.tasks import send_reminder_for_new_registration
+        # Trigger the task asynchronously
+        send_reminder_for_new_registration.delay(str(instance.id))
